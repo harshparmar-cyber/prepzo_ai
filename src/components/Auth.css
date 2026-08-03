@@ -5,9 +5,16 @@
     font-family:'Poppins',sans-serif;
 }
 
+html,
+body,
+#root{
+    width:100%;
+    height:100%;
+}
+
 body{
     background:linear-gradient(135deg,#6c63ff,#4b3cff);
-    min-height:100vh;
+    overflow:hidden;
 }
 
 .container{
@@ -16,7 +23,9 @@ body{
     display:flex;
     justify-content:center;
     align-items:center;
-    padding:30px;
+    padding:0;
+    position:relative;
+    overflow:hidden;
     background:linear-gradient(135deg,#6c63ff,#4b3cff);
 }
 
@@ -200,6 +209,18 @@ body{
 
 @media(max-width:500px){
 
+
+.container{
+    padding:20px;
+}
+
+.card{
+    width:100%;
+    max-width:360px;
+}
+
+}
+
 .card{
 
     padding:35px 28px;
@@ -226,4 +247,3 @@ body{
 
 }
 
-}
