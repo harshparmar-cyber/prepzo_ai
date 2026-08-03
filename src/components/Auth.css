@@ -14,16 +14,15 @@ body,
 
 body{
     background:linear-gradient(135deg,#6c63ff,#4b3cff);
-    overflow:hidden;
+    
 }
 
 .container{
     width:100%;
-    min-height:100vh;
+    height:100vh;
     display:flex;
     justify-content:center;
     align-items:center;
-    padding:0;
     position:relative;
     overflow:hidden;
     background:linear-gradient(135deg,#6c63ff,#4b3cff);
