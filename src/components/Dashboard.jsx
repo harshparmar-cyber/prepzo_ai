@@ -8,6 +8,7 @@ import UploadBox from "../components/UploadBox";
 import PromptBox from "../components/PromptBox";
 import RecentFiles from "../components/RecentFiles";
 import GeneratedNotes from "../components/GeneratedNotes";
+import Profile from "../components/Profile";
 
 import "./Dashboard.css";
 
@@ -20,10 +21,8 @@ function Dashboard() {
 
   const [generatedNotes, setGeneratedNotes] = useState("");
 
-  // NEW
   const [mode, setMode] = useState("notes");
 
-  // Shared State
   const [selectedFile, setSelectedFile] = useState(null);
   const [pdfText, setPdfText] = useState("");
 
@@ -42,7 +41,6 @@ function Dashboard() {
         setSidebarOpen={setSidebarOpen}
         activeMenu={activeMenu}
         setActiveMenu={setActiveMenu}
-        mode={mode}
         setMode={setMode}
       />
 
@@ -72,40 +70,53 @@ function Dashboard() {
 
         </div>
 
-        <DashboardHero />
+        {/* ================= PROFILE ================= */}
 
-        <ToolCards
-          activeTool={activeTool}
-          setActiveTool={setActiveTool}
-          mode={mode}
-          setMode={setMode}
-        />
+        {activeMenu === "Profile" ? (
 
-        <div className="generator">
+          <Profile />
 
-          <UploadBox
-            selectedFile={selectedFile}
-            setSelectedFile={setSelectedFile}
-            pdfText={pdfText}
-            setPdfText={setPdfText}
-          />
+        ) : (
 
-          <PromptBox
-            mode={mode}
-            selectedFile={selectedFile}
-            pdfText={pdfText}
-            setGeneratedNotes={setGeneratedNotes}
-          />
+          <>
+            <DashboardHero />
 
-        </div>
+            <ToolCards
+              activeTool={activeTool}
+              setActiveTool={setActiveTool}
+              mode={mode}
+              setMode={setMode}
+            />
 
-        <GeneratedNotes
-          mode={mode}
-          notes={generatedNotes}
-           selectedFile={selectedFile}
-        />
+            <div className="generator">
 
-        <RecentFiles />
+              <UploadBox
+                selectedFile={selectedFile}
+                setSelectedFile={setSelectedFile}
+                pdfText={pdfText}
+                setPdfText={setPdfText}
+              />
+
+              <PromptBox
+                mode={mode}
+                selectedFile={selectedFile}
+                pdfText={pdfText}
+                setGeneratedNotes={setGeneratedNotes}
+              />
+
+            </div>
+
+            <GeneratedNotes
+              mode={mode}
+              notes={generatedNotes}
+              selectedFile={selectedFile}
+            />
+
+            <RecentFiles />
+
+          </>
+
+        )}
 
       </main>
 

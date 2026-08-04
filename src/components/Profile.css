@@ -1,0 +1,252 @@
+/* ==========================================================
+   PROFILE PAGE
+========================================================== */
+
+.profile-page{
+
+    display:flex;
+    flex-direction:column;
+
+    gap:30px;
+
+    margin-top:30px;
+
+    animation:fadeProfile .4s ease;
+
+}
+
+/* ==========================================================
+   PROFILE CARD
+========================================================== */
+
+.profile-card{
+
+    background:linear-gradient(135deg,#6C63FF,#5C4EF5);
+
+    color:white;
+
+    border-radius:28px;
+
+    padding:45px;
+
+    text-align:center;
+
+    box-shadow:0 20px 45px rgba(92,78,245,.28);
+
+}
+
+.profile-avatar{
+
+    font-size:110px;
+
+    margin-bottom:18px;
+
+    color:white;
+
+}
+
+.profile-card h2{
+
+    font-size:34px;
+
+    font-weight:700;
+
+    margin-bottom:8px;
+
+}
+
+.profile-card p{
+
+    font-size:17px;
+
+    opacity:.95;
+
+    margin-bottom:10px;
+
+}
+
+.profile-card span{
+
+    font-size:15px;
+
+    opacity:.85;
+
+}
+
+/* ==========================================================
+   STATS GRID
+========================================================== */
+
+.profile-stats{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+
+    gap:24px;
+
+}
+
+/* ==========================================================
+   STAT CARD
+========================================================== */
+
+.stat-card{
+
+    background:white;
+
+    border-radius:22px;
+
+    padding:30px;
+
+    text-align:center;
+
+    box-shadow:0 12px 35px rgba(0,0,0,.08);
+
+    transition:.35s;
+
+    cursor:pointer;
+
+}
+
+.stat-card:hover{
+
+    transform:translateY(-8px);
+
+    box-shadow:0 24px 45px rgba(92,78,245,.18);
+
+}
+
+.stat-card svg{
+
+    font-size:42px;
+
+    color:#5C4EF5;
+
+    margin-bottom:18px;
+
+}
+
+.stat-card h3{
+
+    font-size:36px;
+
+    color:#222;
+
+    margin-bottom:8px;
+
+}
+
+.stat-card p{
+
+    color:#777;
+
+    font-size:15px;
+
+    font-weight:500;
+
+}
+
+/* ==========================================================
+   ANIMATION
+========================================================== */
+
+@keyframes fadeProfile{
+
+    from{
+
+        opacity:0;
+        transform:translateY(25px);
+
+    }
+
+    to{
+
+        opacity:1;
+        transform:translateY(0);
+
+    }
+
+}
+
+/* ==========================================================
+   TABLET
+========================================================== */
+
+@media(max-width:992px){
+
+.profile-card{
+
+    padding:35px;
+
+}
+
+.profile-avatar{
+
+    font-size:90px;
+
+}
+
+.profile-card h2{
+
+    font-size:28px;
+
+}
+
+}
+
+/* ==========================================================
+   MOBILE
+========================================================== */
+
+@media(max-width:768px){
+
+.profile-page{
+
+    margin-top:20px;
+
+}
+
+.profile-card{
+
+    padding:28px 20px;
+
+}
+
+.profile-avatar{
+
+    font-size:80px;
+
+}
+
+.profile-card h2{
+
+    font-size:24px;
+
+}
+
+.profile-card p{
+
+    font-size:15px;
+
+}
+
+.profile-stats{
+
+    grid-template-columns:1fr;
+
+}
+
+.stat-card{
+
+    padding:24px;
+
+}
+
+.stat-card h3{
+
+    font-size:30px;
+
+}
+
+}

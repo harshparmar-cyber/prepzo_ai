@@ -19,11 +19,10 @@ function Sidebar({
   setSidebarOpen,
   activeMenu,
   setActiveMenu,
-  mode,
   setMode,
 }) {
-
   const navigate = useNavigate();
+
   const handleMenuClick = (menu) => {
     setActiveMenu(menu);
 
@@ -35,25 +34,22 @@ function Sidebar({
       setMode("viva");
     }
 
-    // Close sidebar on mobile after selecting
+    // Close sidebar on mobile
     setSidebarOpen(false);
   };
 
   const handleLogout = async () => {
-  try {
-    await signOut(auth);
+    try {
+      await signOut(auth);
 
-    toast.success("Logged out successfully 👋");
+      toast.success("Logged out successfully 👋");
 
-    navigate("/");
-    // or navigate("/login")
-    // depending on your routes
-
-  } catch (error) {
-    toast.error("Failed to logout");
-    console.log(error);
-  }
-};
+      navigate("/");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to logout");
+    }
+  };
 
   return (
     <aside className={`sidebar ${sidebarOpen ? "show" : ""}`}>
@@ -67,9 +63,7 @@ function Sidebar({
 
       <div className="sidebar-top">
 
-        {/* Logo */}
         <div className="logo">
-
           <div className="logo-icon">
             🎓
           </div>
@@ -78,7 +72,6 @@ function Sidebar({
             <h2>Prepzo AI</h2>
             <span>Learn Smarter</span>
           </div>
-
         </div>
 
         <ul>
@@ -93,10 +86,7 @@ function Sidebar({
 
           <li
             className={activeMenu === "Smart Notes" ? "active" : ""}
-            onClick={() => {
-              setActiveMenu("Smart Notes");
-              setMode("notes");
-            }}
+            onClick={() => handleMenuClick("Smart Notes")}
           >
             <FaBook />
             <span>Smart Notes</span>
@@ -104,10 +94,7 @@ function Sidebar({
 
           <li
             className={activeMenu === "MCQs" ? "active" : ""}
-            onClick={() => {
-              setActiveMenu("MCQs");
-              setMode("mcq");
-            }}
+            onClick={() => handleMenuClick("MCQs")}
           >
             <FaQuestionCircle />
             <span>MCQs</span>
@@ -115,10 +102,7 @@ function Sidebar({
 
           <li
             className={activeMenu === "Viva Questions" ? "active" : ""}
-            onClick={() => {
-              setActiveMenu("Viva Questions");
-              setMode("viva");
-            }}
+            onClick={() => handleMenuClick("Viva Questions")}
           >
             <FaMicrophone />
             <span>Viva Questions</span>
@@ -154,7 +138,10 @@ function Sidebar({
 
       <div className="sidebar-bottom">
 
-        <button className="logout"  onClick={handleLogout}>
+        <button
+          className="logout"
+          onClick={handleLogout}
+        >
           <FaSignOutAlt />
           <span>Logout</span>
         </button>
