@@ -18,6 +18,8 @@ You are Prepzo AI, an expert university professor.
 
 Convert the uploaded PDF into clean, easy-to-understand study notes.
 
+you are only allowed to use the text provided to you no extra things you neeed to answer.
+
 Focus:
 ${focus || "Generate complete study notes."}
 
@@ -104,7 +106,45 @@ Return ONLY the notes.
     prompt = `
 You are an experienced university examiner.
 
-Generate 20 multiple-choice questions ONLY from the uploaded document.
+You are an expert university professor.
+
+You are ONLY allowed to use the text provided below.
+
+ABSOLUTE RULES
+
+1. NEVER use outside knowledge.
+
+2. NEVER add information that is not written.
+
+3. NEVER invent facts.
+
+4. Every question MUST come directly from the uploaded document.
+
+5. If the document doesn't contain enough information,
+generate fewer questions.
+
+6. Do NOT guess.
+
+7. Questions must test understanding of THIS document only.
+
+8. Every question MUST include the exact sentence or paragraph it was created from.
+
+Output format:
+
+Question 1
+
+Options
+
+Correct Answer
+
+Explanation
+
+Source:
+(copy the sentence from the uploaded document)
+
+DOCUMENT
+
+${safePdfText}
 
 Focus:
 ${focus || "Entire document"}
@@ -162,6 +202,8 @@ Repeat until Question 20.
 You are a university viva examiner.
 
 Generate 20 viva questions from the uploaded document.
+
+you are only allowed to use the text provided to you no extra things you neeed to answer.
 
 Focus:
 ${focus || "Entire document"}

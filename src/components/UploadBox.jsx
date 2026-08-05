@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FaCloudUploadAlt, FaFilePdf } from "react-icons/fa";
 import { toast } from "sonner";
-import { extractTextFromPDF } from "../utils/pdfExtractor";
+import { extractTextFromPDF } from "../services/pdfExtractor";
 
 function UploadBox({
 
@@ -33,7 +33,7 @@ function UploadBox({
 
       setReading(true);
 
-      toast.loading("Reading PDF...", {
+      toast.loading("Analyzing PDF...", {
 
         id: "pdf",
 
