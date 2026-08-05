@@ -27,9 +27,8 @@ function ToolCards({
 
       {/* Smart Notes */}
       <div
-        className={`tool-card ${
-          mode === "notes" ? "active" : ""
-        }`}
+        className={`tool-card ${mode === "notes" ? "active" : ""
+          }`}
         onClick={() => selectTool("Smart Notes")}
       >
         <div className="tool-icon">
@@ -46,9 +45,8 @@ function ToolCards({
 
       {/* MCQs */}
       <div
-        className={`tool-card ${
-          mode === "mcq" ? "active" : ""
-        }`}
+        className={`tool-card ${mode === "mcq" ? "active" : ""
+          }`}
         onClick={() => selectTool("MCQs")}
       >
         <div className="tool-icon">
@@ -64,9 +62,8 @@ function ToolCards({
 
       {/* Viva */}
       <div
-        className={`tool-card ${
-          mode === "viva" ? "active" : ""
-        }`}
+        className={`tool-card ${mode === "viva" ? "active" : ""
+          }`}
         onClick={() => selectTool("Viva Questions")}
       >
         <div className="tool-icon">
@@ -78,6 +75,20 @@ function ToolCards({
         <p>
           AI-generated viva questions with model answers.
         </p>
+      </div>
+
+      <div
+        className={`tool-card ${mode === "observation" ? "active" : ""}`}
+        onClick={() => {
+          setMode("observation");
+          setActiveTool("Observations");
+        }}
+      >
+        <div className="tool-icon">👀</div>
+
+        <h3>Observations</h3>
+
+        <p>Generate observations for screenshots inside your PDF.</p>
       </div>
 
     </div>

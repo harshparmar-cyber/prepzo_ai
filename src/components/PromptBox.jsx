@@ -80,11 +80,13 @@ Generate only important points...`}
         className="generate-btn"
         onClick={handleGenerate}
       >
-         {mode === "notes"
-        ? "Generate Smart Notes"
-        : mode === "mcq"
-        ? "Generate MCQs"
-        : "Generate Viva Questions"}
+        {mode === "notes"
+          ? "Generate Smart Notes"
+          : mode === "mcq"
+            ? "Generate MCQs"
+            : mode === "viva"
+              ? "Generate Viva Questions"
+              : "Generate Observations"}
       </button>
 
     </div>

@@ -12,6 +12,7 @@ import {
   FaCog,
   FaTimes,
   FaSignOutAlt,
+  FaEye,
 } from "react-icons/fa";
 
 function Sidebar({
@@ -32,6 +33,8 @@ function Sidebar({
       setMode("mcq");
     } else if (menu === "Viva Questions") {
       setMode("viva");
+    } else if (menu === "Observations") {
+      setMode("observation");
     }
 
     // Close sidebar on mobile
@@ -106,6 +109,14 @@ function Sidebar({
           >
             <FaMicrophone />
             <span>Viva Questions</span>
+          </li>
+
+          <li
+            className={activeMenu === "Observations" ? "active" : ""}
+            onClick={() => handleMenuClick("Observations")}
+          >
+            <FaEye />
+            <span>Observations</span>
           </li>
 
           <li

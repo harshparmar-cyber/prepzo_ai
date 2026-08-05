@@ -38,8 +38,10 @@ function GeneratedNotes({
         mode === "notes"
           ? "Smart Notes"
           : mode === "mcq"
-          ? "MCQs"
-          : "Viva Questions";
+            ? "MCQs"
+            : mode === "viva"
+              ? "Viva Questions"
+              : "Observations";
 
       // Final filename
       const fileName = `${originalName} - ${suffix}.pdf`;
@@ -118,10 +120,12 @@ function GeneratedNotes({
       <div className="notes-header">
         <h2>
           {mode === "notes"
-            ? "📘 Smart Notes"
+            ? "📘  Generated Smart Notes"
             : mode === "mcq"
-            ? "❓ MCQs"
-            : "🎤 Viva Questions"}
+              ? "❓  Generated MCQs"
+              : mode === "viva"
+                ? "🎤  Generated Viva Questions"
+                : "👀  Generated Observations"}
         </h2>
 
         <button

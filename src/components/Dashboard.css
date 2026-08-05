@@ -41,7 +41,7 @@ body{
     top:0;
     left:0;
 
-    width:260px;
+    width: 245px;
     height:100vh;
     padding: 30px 22px;
 
@@ -51,7 +51,7 @@ body{
     flex-direction:column;
     justify-content:space-between;
 
-    padding:28px 20px;
+    padding:22px 16px;
 
     border-right:1px solid #ECECEC;
 
@@ -74,6 +74,16 @@ body{
     border-radius:50px;
 }
 
+.sidebar-top{
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.sidebar-bottom{
+    margin-top: 20px;
+}
+
 /* ==========================================================
    LOGO
 ========================================================== */
@@ -82,7 +92,7 @@ body{
     display:flex;
     align-items:center;
     gap:16px;
-    margin-bottom:40px;
+    margin-bottom:24px;
 }
 
 .logo-icon{
@@ -129,36 +139,30 @@ body{
 ========================================================== */
 
 .sidebar ul{
-    list-style:none;
+    list-style: none;
+    padding: 0;
+    margin: 0;
 }
 
 .sidebar li{
+    display: flex;
+    align-items: center;
+    gap: 12px;
 
-    display:flex;
-    align-items:center;
+    padding: 12px 16px;
+    margin-bottom: 6px;
 
-    gap:15px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: .3s;
 
-    padding:15px 18px;
-
-    border-radius:16px;
-
-    cursor:pointer;
-
-    transition:.30s;
-
-    margin-bottom:10px;
-
-    color:#555;
-
-    font-weight:500;
-
+    color: #555;
+    font-size: 15px;
+    font-weight: 500;
 }
 
 .sidebar li svg{
-
-    font-size:18px;
-
+    font-size: 16px;
 }
 
 .sidebar li:hover{
@@ -501,9 +505,9 @@ body{
 
     display:grid;
 
-    grid-template-columns:repeat(3,1fr);
+    grid-template-columns:repeat(4,1fr);
 
-    gap:22px;
+    gap:18px;
 
     margin-bottom:35px;
 
