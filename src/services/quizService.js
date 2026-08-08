@@ -35,7 +35,6 @@ export function generateRoomCode() {
   return code;
 }
 
-
 // ========================================
 // Create Quiz Room
 // ========================================
@@ -44,16 +43,35 @@ export async function createQuizRoom(
   questions,
   hostId
 ) {
-  let roomCode;
-  let existingRoom;
+  if (!questions || questions.length === 0) {
+    throw new Error(
+      "Quiz questions are missing."
+    );
+  }
 
-  // Make sure the generated code is unique
-  do {
+  if (!hostId) {
+    throw new Error(
+      "Host user is not logged in."
+    );
+  }
+
+  let roomCode;
+  let existingRoom = true;
+
+  // ----------------------------------------
+  // Generate unique room code
+  // ----------------------------------------
+
+  while (existingRoom) {
     roomCode = generateRoomCode();
 
     const roomQuery = query(
       collection(db, "quizRooms"),
-      where("roomCode", "==", roomCode),
+      where(
+        "roomCode",
+        "==",
+        roomCode
+      ),
       limit(1)
     );
 
@@ -61,49 +79,70 @@ export async function createQuizRoom(
       await getDocs(roomQuery);
 
     existingRoom = !snapshot.empty;
+  }
 
-  } while (existingRoom);
-
+  // ----------------------------------------
+  // Create quiz room
+  // ----------------------------------------
 
   const roomData = {
-    roomCode,
-    hostId,
-    questions,
-    status: "waiting",
-    createdAt: serverTimestamp(),
-  };
+    roomCode: roomCode,
 
+    hostId: hostId,
+
+    questions: questions,
+
+    // IMPORTANT:
+    // QuizPage checks for "active"
+    status: "active",
+
+    createdAt:
+      serverTimestamp(),
+  };
 
   const roomRef = await addDoc(
     collection(db, "quizRooms"),
     roomData
   );
 
+  // ----------------------------------------
+  // Add host as participant
+  // ----------------------------------------
 
-  // Add host as first participant
-  await addDoc(
+  const participantsRef =
     collection(
       db,
       "quizRooms",
       roomRef.id,
       "participants"
-    ),
+    );
+
+  await addDoc(
+    participantsRef,
     {
       uid: hostId,
+
       name: "Host",
+
       score: 0,
-      joinedAt: serverTimestamp(),
+
       finished: false,
+
+      joinedAt:
+        serverTimestamp(),
     }
   );
 
+  // ----------------------------------------
+  // Return room information
+  // ----------------------------------------
 
   return {
     roomId: roomRef.id,
-    roomCode,
+
+    roomCode: roomCode,
   };
 }
-
 
 // ========================================
 // Find Quiz Room By Code
@@ -112,36 +151,43 @@ export async function createQuizRoom(
 export async function getQuizRoomByCode(
   roomCode
 ) {
-  const cleanCode =
-    roomCode.trim().toUpperCase();
+  if (!roomCode) {
+    return null;
+  }
 
+  const cleanCode =
+    roomCode
+      .trim()
+      .toUpperCase();
 
   const roomQuery = query(
     collection(db, "quizRooms"),
-    where("roomCode", "==", cleanCode),
+
+    where(
+      "roomCode",
+      "==",
+      cleanCode
+    ),
+
     limit(1)
   );
 
-
   const snapshot =
     await getDocs(roomQuery);
-
 
   if (snapshot.empty) {
     return null;
   }
 
-
   const roomDoc =
     snapshot.docs[0];
 
-
   return {
     id: roomDoc.id,
+
     ...roomDoc.data(),
   };
 }
-
 
 // ========================================
 // Join Quiz Room
@@ -152,9 +198,26 @@ export async function joinQuizRoom(
   userId,
   userName
 ) {
-  const room =
-    await getQuizRoomByCode(roomCode);
+  if (!roomCode) {
+    throw new Error(
+      "Please enter a quiz room code."
+    );
+  }
 
+  if (!userId) {
+    throw new Error(
+      "Please login before joining the quiz."
+    );
+  }
+
+  // ----------------------------------------
+  // Find room
+  // ----------------------------------------
+
+  const room =
+    await getQuizRoomByCode(
+      roomCode
+    );
 
   if (!room) {
     throw new Error(
@@ -162,55 +225,80 @@ export async function joinQuizRoom(
     );
   }
 
+  // ----------------------------------------
+  // Check room status
+  // ----------------------------------------
 
-  if (room.status === "finished") {
+  if (
+    room.status === "finished"
+  ) {
     throw new Error(
       "This quiz has already ended."
     );
   }
 
+  // ----------------------------------------
+  // Participants collection
+  // ----------------------------------------
 
+  const participantsRef =
+    collection(
+      db,
+      "quizRooms",
+      room.id,
+      "participants"
+    );
+
+  // ----------------------------------------
   // Check if user already joined
-  const participantsRef = collection(
-    db,
-    "quizRooms",
-    room.id,
-    "participants"
-  );
+  // ----------------------------------------
 
+  const participantQuery =
+    query(
+      participantsRef,
 
-  const participantQuery = query(
-    participantsRef,
-    where("uid", "==", userId),
-    limit(1)
-  );
+      where(
+        "uid",
+        "==",
+        userId
+      ),
 
+      limit(1)
+    );
 
   const participantSnapshot =
-    await getDocs(participantQuery);
+    await getDocs(
+      participantQuery
+    );
 
+  // ----------------------------------------
+  // Add participant
+  // ----------------------------------------
 
-  // Don't create duplicate participant
-  if (participantSnapshot.empty) {
-
+  if (
+    participantSnapshot.empty
+  ) {
     await addDoc(
       participantsRef,
       {
         uid: userId,
+
         name:
           userName?.trim() ||
           "Participant",
+
         score: 0,
-        joinedAt: serverTimestamp(),
+
         finished: false,
+
+        joinedAt:
+          serverTimestamp(),
       }
     );
   }
 
-
   return room;
 }
-
 
 // ========================================
 // Get Quiz Room By Document ID
@@ -219,6 +307,10 @@ export async function joinQuizRoom(
 export async function getQuizRoom(
   roomId
 ) {
+  if (!roomId) {
+    return null;
+  }
+
   const roomRef = doc(
     db,
     "quizRooms",
@@ -228,18 +320,16 @@ export async function getQuizRoom(
   const snapshot =
     await getDoc(roomRef);
 
-
   if (!snapshot.exists()) {
     return null;
   }
 
-
   return {
     id: snapshot.id,
+
     ...snapshot.data(),
   };
 }
-
 
 // ========================================
 // Update Quiz Room
@@ -249,6 +339,12 @@ export async function updateQuizRoom(
   roomId,
   data
 ) {
+  if (!roomId) {
+    throw new Error(
+      "Quiz room ID is required."
+    );
+  }
+
   const roomRef = doc(
     db,
     "quizRooms",
@@ -261,6 +357,35 @@ export async function updateQuizRoom(
   );
 }
 
+// ========================================
+// Finish Quiz Room
+// ========================================
+
+export async function finishQuizRoom(
+  roomId
+) {
+  if (!roomId) {
+    throw new Error(
+      "Quiz room ID is required."
+    );
+  }
+
+  const roomRef = doc(
+    db,
+    "quizRooms",
+    roomId
+  );
+
+  await updateDoc(
+    roomRef,
+    {
+      status: "finished",
+
+      finishedAt:
+        serverTimestamp(),
+    }
+  );
+}
 
 // ========================================
 // Delete Quiz Room
@@ -269,11 +394,19 @@ export async function updateQuizRoom(
 export async function deleteQuizRoom(
   roomId
 ) {
+  if (!roomId) {
+    throw new Error(
+      "Quiz room ID is required."
+    );
+  }
+
   const roomRef = doc(
     db,
     "quizRooms",
     roomId
   );
 
-  await deleteDoc(roomRef);
+  await deleteDoc(
+    roomRef
+  );
 }
