@@ -9,6 +9,7 @@ import PromptBox from "../components/PromptBox";
 import RecentFiles from "../components/RecentFiles";
 import GeneratedNotes from "../components/GeneratedNotes";
 import Profile from "../components/Profile";
+import QuizRoom from "../components/QuizRoom";
 
 import "./Dashboard.css";
 
@@ -110,6 +111,11 @@ function Dashboard() {
               mode={mode}
               notes={generatedNotes}
               selectedFile={selectedFile}
+            />
+
+            <QuizRoom
+              selectedFile={selectedFile}
+              pdfText={pdfText}
             />
 
             <RecentFiles />

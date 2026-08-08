@@ -258,3 +258,93 @@ Repeat until Question 20.
     throw error;
   }
 }
+
+export async function generateQuizQuestions(pdfText) {
+
+  const safePdfText = pdfText
+    ? pdfText.slice(0, 15000)
+    : "";
+
+  const prompt = `
+You are an expert university quiz creator.
+
+Generate EXACTLY 10 multiple-choice questions
+from ONLY the document provided below.
+
+STRICT RULES:
+
+1. Use ONLY information present in the document.
+2. Do NOT use outside knowledge.
+3. Do NOT invent information.
+4. Every question must be answerable from the document.
+5. Create exactly 4 options for every question.
+6. Only ONE option can be correct.
+7. Questions should test understanding, not just memorization.
+8. Keep the questions relevant to the uploaded PDF.
+9. Return ONLY valid JSON.
+10. Do not use Markdown.
+11. Do not add explanations outside the JSON.
+
+Return exactly this structure:
+
+[
+  {
+    "question": "Question here",
+    "options": [
+      "Option A",
+      "Option B",
+      "Option C",
+      "Option D"
+    ],
+    "answer": "Option A"
+  }
+]
+
+DOCUMENT:
+
+${safePdfText}
+`;
+
+  try {
+
+    const response =
+      await ai.models.generateContent({
+
+        model: "gemini-flash-latest",
+
+        contents: prompt,
+
+      });
+
+    let text = response.text.trim();
+
+    // Remove accidental Markdown code fences
+    text = text
+      .replace(/^```json/i, "")
+      .replace(/^```/i, "")
+      .replace(/```$/i, "")
+      .trim();
+
+    const questions = JSON.parse(text);
+
+    if (
+      !Array.isArray(questions) ||
+      questions.length !== 10
+    ) {
+      throw new Error(
+        "Gemini did not generate exactly 10 questions."
+      );
+    }
+
+    return questions;
+
+  } catch (error) {
+
+    console.error(
+      "Quiz Generation Error:",
+      error
+    );
+
+    throw error;
+  }
+}
