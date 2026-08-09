@@ -260,91 +260,136 @@ Repeat until Question 20.
 }
 
 export async function generateQuizQuestions(pdfText) {
-
   const safePdfText = pdfText
     ? pdfText.slice(0, 15000)
     : "";
 
   const prompt = `
-You are an expert university quiz creator.
+You are an expert university professor creating a quiz from a student's PDF.
 
-Generate EXACTLY 10 multiple-choice questions
-from ONLY the document provided below.
+Generate exactly 10 multiple-choice questions based ONLY on the provided PDF content.
 
-STRICT RULES:
+IMPORTANT RULES:
 
-1. Use ONLY information present in the document.
-2. Do NOT use outside knowledge.
-3. Do NOT invent information.
-4. Every question must be answerable from the document.
-5. Create exactly 4 options for every question.
-6. Only ONE option can be correct.
-7. Questions should test understanding, not just memorization.
-8. Keep the questions relevant to the uploaded PDF.
-9. Return ONLY valid JSON.
-10. Do not use Markdown.
-11. Do not add explanations outside the JSON.
+1. Generate exactly 10 questions.
+2. Each question must have exactly 4 options.
+3. Options must be ordered A, B, C, D.
+4. The "answer" field MUST contain ONLY the letter:
+   A
+   B
+   C
+   or
+   D
 
-Return exactly this structure:
+5. NEVER return undefined.
+6. NEVER return null.
+7. NEVER put the answer text inside the answer field.
+8. Every question MUST have a valid answer.
+9. The correct answer MUST correspond to one of the four options.
+10. Do not create questions whose answer cannot be determined from the PDF.
+
+Return ONLY valid JSON.
+
+Use exactly this structure:
 
 [
   {
-    "question": "Question here",
+    "question": "Question text",
     "options": [
       "Option A",
       "Option B",
       "Option C",
       "Option D"
     ],
-    "answer": "Option A"
+    "answer": "A"
   }
 ]
 
-DOCUMENT:
+PDF CONTENT:
 
 ${safePdfText}
 `;
 
+  const response = await ai.models.generateContent({
+    model: "gemini-flash-latest",
+    contents: prompt,
+  });
+
+  let text = response.text.trim();
+
+  // Remove accidental markdown code fences
+  text = text
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+
+  let questions;
+
   try {
-
-    const response =
-      await ai.models.generateContent({
-
-        model: "gemini-flash-latest",
-
-        contents: prompt,
-
-      });
-
-    let text = response.text.trim();
-
-    // Remove accidental Markdown code fences
-    text = text
-      .replace(/^```json/i, "")
-      .replace(/^```/i, "")
-      .replace(/```$/i, "")
-      .trim();
-
-    const questions = JSON.parse(text);
-
-    if (
-      !Array.isArray(questions) ||
-      questions.length !== 10
-    ) {
-      throw new Error(
-        "Gemini did not generate exactly 10 questions."
-      );
-    }
-
-    return questions;
-
+    questions = JSON.parse(text);
   } catch (error) {
-
     console.error(
-      "Quiz Generation Error:",
+      "Quiz JSON parsing error:",
       error
     );
 
-    throw error;
+    console.error(
+      "Gemini response:",
+      text
+    );
+
+    throw new Error(
+      "AI returned invalid quiz data."
+    );
   }
+
+  if (
+    !Array.isArray(questions) ||
+    questions.length !== 10
+  ) {
+    throw new Error(
+      "AI did not generate exactly 10 questions."
+    );
+  }
+
+  // Validate every question
+  questions.forEach((question, index) => {
+    if (!question.question) {
+      throw new Error(
+        `Question ${index + 1} is missing.`
+      );
+    }
+
+    if (
+      !Array.isArray(question.options) ||
+      question.options.length !== 4
+    ) {
+      throw new Error(
+        `Question ${index + 1} must have 4 options.`
+      );
+    }
+
+    if (
+      !["A", "B", "C", "D"].includes(
+        question.answer?.toUpperCase()
+      )
+    ) {
+      throw new Error(
+        `Question ${index + 1} has an invalid correct answer.`
+      );
+    }
+  });
+
+  return questions.map((question) => ({
+    question: question.question.trim(),
+
+    options: question.options.map(
+      (option) => option.toString().trim()
+    ),
+
+    answer:
+      question.answer
+        .toUpperCase()
+        .trim(),
+  }));
 }

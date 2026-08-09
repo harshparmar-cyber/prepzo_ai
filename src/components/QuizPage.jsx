@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+
 import {
   collection,
   query,
   where,
   getDocs,
   limit,
+  doc,
+  updateDoc,
+  serverTimestamp,
+  onSnapshot,
 } from "firebase/firestore";
 
-import { db } from "../firebase";
+import { auth, db } from "../firebase";
 import { toast } from "sonner";
 
 function QuizPage() {
@@ -20,14 +25,151 @@ function QuizPage() {
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
+
   const [answers, setAnswers] = useState([]);
+  const [submittedAnswers, setSubmittedAnswers] = useState([]);
 
   const [quizFinished, setQuizFinished] = useState(false);
   const [score, setScore] = useState(0);
 
-  // =========================================
-  // LOAD QUIZ
-  // =========================================
+  const [participants, setParticipants] = useState([]);
+
+  // =========================================================
+  // NORMALIZE CORRECT ANSWER
+  // =========================================================
+
+  const getCorrectAnswerLetter = (question) => {
+    if (!question || !question.answer) {
+      return null;
+    }
+
+    const rawAnswer = question.answer
+      .toString()
+      .trim();
+
+    if (!rawAnswer) {
+      return null;
+    }
+
+    /*
+      CASE 1:
+      Gemini gives:
+      "A"
+    */
+
+    const directLetterMatch =
+      rawAnswer.match(/^([A-Z])$/i);
+
+    if (directLetterMatch) {
+      const letter =
+        directLetterMatch[1].toUpperCase();
+
+      const index =
+        letter.charCodeAt(0) - 65;
+
+      if (
+        question.options &&
+        index >= 0 &&
+        index < question.options.length
+      ) {
+        return letter;
+      }
+    }
+
+    /*
+      CASE 2:
+      Gemini gives:
+      "A) Julius Caesar"
+      "A. Julius Caesar"
+      "A - Julius Caesar"
+    */
+
+    const letterWithTextMatch =
+      rawAnswer.match(/^([A-Z])\s*[\)\.\:\-]\s*(.*)$/i);
+
+    if (letterWithTextMatch) {
+      const letter =
+        letterWithTextMatch[1].toUpperCase();
+
+      const index =
+        letter.charCodeAt(0) - 65;
+
+      if (
+        question.options &&
+        index >= 0 &&
+        index < question.options.length
+      ) {
+        return letter;
+      }
+    }
+
+    /*
+      CASE 3:
+      Gemini gives the complete answer:
+      "Julius Caesar"
+
+      We compare it with every option.
+    */
+
+    if (question.options) {
+      const answerText =
+        rawAnswer
+          .toLowerCase()
+          .replace(/^[a-z]\s*[\)\.\:\-]\s*/i, "")
+          .trim();
+
+      const optionIndex =
+        question.options.findIndex(
+          (option) =>
+            option
+              ?.toString()
+              .trim()
+              .toLowerCase() === answerText
+        );
+
+      if (optionIndex !== -1) {
+        return String.fromCharCode(
+          65 + optionIndex
+        );
+      }
+
+      /*
+        More flexible comparison.
+
+        Example:
+        answer = "Julius Caesar"
+        option = "Julius Caesar"
+      */
+
+      const flexibleIndex =
+        question.options.findIndex(
+          (option) => {
+            const cleanOption =
+              option
+                ?.toString()
+                .trim()
+                .toLowerCase();
+
+            return (
+              cleanOption.includes(answerText) ||
+              answerText.includes(cleanOption)
+            );
+          }
+        );
+
+      if (flexibleIndex !== -1) {
+        return String.fromCharCode(
+          65 + flexibleIndex
+        );
+      }
+    }
+
+    return null;
+  };
+
+  // =========================================================
+  // LOAD QUIZ FROM FIRESTORE
+  // =========================================================
 
   useEffect(() => {
     const loadQuiz = async () => {
@@ -40,33 +182,50 @@ function QuizPage() {
           return;
         }
 
+        const cleanRoomCode =
+          roomCode.trim().toUpperCase();
+
         const quizQuery = query(
           collection(db, "quizRooms"),
           where(
             "roomCode",
             "==",
-            roomCode.toUpperCase()
+            cleanRoomCode
           ),
           limit(1)
         );
 
-        const snapshot = await getDocs(quizQuery);
+        const snapshot =
+          await getDocs(quizQuery);
 
         if (snapshot.empty) {
-          toast.error("Quiz room not found.");
+          toast.error(
+            "Quiz room not found."
+          );
+
           setQuiz(null);
           setLoading(false);
           return;
         }
 
-        const quizDoc = snapshot.docs[0];
+        const quizDoc =
+          snapshot.docs[0];
 
         const quizData = {
           id: quizDoc.id,
           ...quizDoc.data(),
         };
 
-        if (quizData.status !== "active") {
+        /*
+          Allow both active and waiting rooms.
+
+          This is important for multiplayer.
+        */
+
+        if (
+          quizData.status !== "active" &&
+          quizData.status !== "waiting"
+        ) {
           toast.error(
             "This quiz room is no longer active."
           );
@@ -84,8 +243,9 @@ function QuizPage() {
           error
         );
 
-        toast.error("Failed to load quiz.");
-
+        toast.error(
+          "Failed to load quiz."
+        );
       } finally {
         setLoading(false);
       }
@@ -94,19 +254,100 @@ function QuizPage() {
     loadQuiz();
   }, [roomCode]);
 
-  // =========================================
+  // =========================================================
+  // REAL-TIME PARTICIPANTS
+  // =========================================================
+
+  useEffect(() => {
+    if (!quiz?.id) {
+      return;
+    }
+
+    const participantsRef =
+      collection(
+        db,
+        "quizRooms",
+        quiz.id,
+        "participants"
+      );
+
+    const unsubscribe =
+      onSnapshot(
+        participantsRef,
+        (snapshot) => {
+          const participantList =
+            snapshot.docs.map(
+              (participantDoc) => ({
+                id: participantDoc.id,
+                ...participantDoc.data(),
+              })
+            );
+
+          /*
+            Sort by score.
+
+            If scores are equal, the player
+            who finished earlier comes first.
+          */
+
+          participantList.sort(
+            (a, b) => {
+              if (
+                (b.score || 0) !==
+                (a.score || 0)
+              ) {
+                return (
+                  (b.score || 0) -
+                  (a.score || 0)
+                );
+              }
+
+              const aTime =
+                a.finishedAt?.seconds ||
+                a.joinedAt?.seconds ||
+                0;
+
+              const bTime =
+                b.finishedAt?.seconds ||
+                b.joinedAt?.seconds ||
+                0;
+
+              return aTime - bTime;
+            }
+          );
+
+          setParticipants(
+            participantList
+          );
+        },
+        (error) => {
+          console.error(
+            "Participant listener error:",
+            error
+          );
+        }
+      );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [quiz?.id]);
+
+  // =========================================================
   // SELECT ANSWER
-  // =========================================
+  // =========================================================
 
   const handleAnswer = (option) => {
     setSelectedAnswer(option);
   };
 
-  // =========================================
+  // =========================================================
   // CALCULATE RESULT
-  // =========================================
+  // =========================================================
 
-  const calculateResult = (finalAnswers) => {
+  const calculateResult = async (
+    finalAnswers
+  ) => {
     let correct = 0;
 
     quiz.questions.forEach(
@@ -115,20 +356,15 @@ function QuizPage() {
           finalAnswers[index];
 
         const correctAnswer =
-          question.answer;
+          getCorrectAnswerLetter(
+            question
+          );
 
         if (
           userAnswer &&
           correctAnswer &&
-          userAnswer
-            .toString()
-            .trim()
-            .toUpperCase() ===
-            correctAnswer
-              .toString()
-              .trim()
-              .charAt(0)
-              .toUpperCase()
+          userAnswer.toUpperCase() ===
+            correctAnswer.toUpperCase()
         ) {
           correct++;
         }
@@ -136,16 +372,108 @@ function QuizPage() {
     );
 
     setScore(correct);
-    setQuizFinished(true);
 
-    toast.success(
-      "Quiz completed! 🎉"
+    /*
+      IMPORTANT:
+      Save the final answers separately.
+
+      This prevents React state timing issues
+      from showing the previous answers.
+    */
+
+    setSubmittedAnswers(
+      [...finalAnswers]
     );
+
+    try {
+      if (!auth.currentUser) {
+        throw new Error(
+          "User is not logged in."
+        );
+      }
+
+      const participantsRef =
+        collection(
+          db,
+          "quizRooms",
+          quiz.id,
+          "participants"
+        );
+
+      const participantQuery =
+        query(
+          participantsRef,
+          where(
+            "uid",
+            "==",
+            auth.currentUser.uid
+          ),
+          limit(1)
+        );
+
+      const participantSnapshot =
+        await getDocs(
+          participantQuery
+        );
+
+      if (
+        !participantSnapshot.empty
+      ) {
+        const participantDoc =
+          participantSnapshot.docs[0];
+
+        const participantRef =
+          doc(
+            db,
+            "quizRooms",
+            quiz.id,
+            "participants",
+            participantDoc.id
+          );
+
+        await updateDoc(
+          participantRef,
+          {
+            score: correct,
+            finished: true,
+            answers: finalAnswers,
+            finishedAt:
+              serverTimestamp(),
+          }
+        );
+      } else {
+        console.warn(
+          "Participant document not found."
+        );
+      }
+
+      setQuizFinished(true);
+
+      toast.success(
+        "Quiz completed! 🎉"
+      );
+
+    } catch (error) {
+      console.error(
+        "Saving quiz result error:",
+        error
+      );
+
+      toast.error(
+        "Quiz completed, but result could not be saved."
+      );
+
+      /*
+        Still show the result locally.
+      */
+
+      setQuizFinished(true);
+    }
   };
 
-  // =========================================
+  // =========================================================
   // NEXT QUESTION
-  // =========================================
+  // =========================================================
 
   const handleNext = () => {
     if (selectedAnswer === null) {
@@ -162,14 +490,24 @@ function QuizPage() {
 
     setAnswers(updatedAnswers);
 
-    // Last question
+    /*
+      LAST QUESTION
+    */
+
     if (
       currentQuestion >=
       quiz.questions.length - 1
     ) {
-      calculateResult(updatedAnswers);
+      calculateResult(
+        updatedAnswers
+      );
+
       return;
     }
+
+    /*
+      NEXT QUESTION
+    */
 
     setSelectedAnswer(null);
 
@@ -178,43 +516,50 @@ function QuizPage() {
     );
   };
 
-  // =========================================
-  // LOADING
-  // =========================================
+  // =========================================================
+  // LOADING SCREEN
+  // =========================================================
 
   if (loading) {
     return (
-      <div className="quiz-page quiz-loading-page">
-        <div className="quiz-loading-card">
-          <div className="quiz-loading-icon">
+      <div className="quiz-page">
+        <div className="quiz-status-card">
+
+          <div className="quiz-status-icon">
             🎯
           </div>
 
-          <h2>Loading Quiz...</h2>
+          <h2>
+            Loading Quiz...
+          </h2>
 
           <p>
             Please wait while we load
             the quiz.
           </p>
+
         </div>
       </div>
     );
   }
 
-  // =========================================
+  // =========================================================
   // QUIZ NOT FOUND
-  // =========================================
+  // =========================================================
 
   if (!quiz) {
     return (
-      <div className="quiz-page quiz-error-page">
-        <div className="quiz-error-card">
+      <div className="quiz-page">
+
+        <div className="quiz-status-card">
 
           <div className="quiz-error-icon">
             😕
           </div>
 
-          <h1>Quiz Not Found</h1>
+          <h1>
+            Quiz Not Found
+          </h1>
 
           <p>
             This quiz room may no longer
@@ -231,28 +576,54 @@ function QuizPage() {
           </button>
 
         </div>
+
       </div>
     );
   }
 
-  // =========================================
+  // =========================================================
   // RESULT SCREEN
-  // =========================================
+  // =========================================================
 
   if (quizFinished) {
     const totalQuestions =
       quiz.questions.length;
 
-    const percentage = Math.round(
-      (score / totalQuestions) * 100
-    );
+    const percentage =
+      totalQuestions > 0
+        ? Math.round(
+            (score /
+              totalQuestions) *
+              100
+          )
+        : 0;
+
+    /*
+      Find current player's ranking.
+    */
+
+    const currentUserId =
+      auth.currentUser?.uid;
+
+    const currentPlayerIndex =
+      participants.findIndex(
+        (player) =>
+          player.uid === currentUserId
+      );
+
+    const currentRank =
+      currentPlayerIndex !== -1
+        ? currentPlayerIndex + 1
+        : null;
 
     return (
       <div className="quiz-page">
 
         <div className="quiz-result-wrapper">
 
-          {/* RESULT CARD */}
+          {/* =========================================
+              RESULT CARD
+          ========================================= */}
 
           <div className="quiz-result-card">
 
@@ -299,13 +670,27 @@ function QuizPage() {
 
             <p className="result-description">
               You answered{" "}
-              <strong>{score}</strong>{" "}
+              <strong>
+                {score}
+              </strong>{" "}
               out of{" "}
               <strong>
                 {totalQuestions}
               </strong>{" "}
               questions correctly.
             </p>
+
+            {currentRank && (
+              <div className="your-rank-box">
+                <span>
+                  🏆 Your Rank
+                </span>
+
+                <strong>
+                  #{currentRank}
+                </strong>
+              </div>
+            )}
 
             <button
               className="quiz-next-btn"
@@ -318,14 +703,134 @@ function QuizPage() {
 
           </div>
 
+          {/* =========================================
+              LEADERBOARD
+          ========================================= */}
 
-          {/* ANSWER REVIEW */}
+          <div className="leaderboard-card">
+
+            <div className="leaderboard-header">
+
+              <div>
+                <span className="leaderboard-icon">
+                  🏆
+                </span>
+
+                <div>
+                  <h2>
+                    Room Leaderboard
+                  </h2>
+
+                  <p>
+                    Scores and ranking of all players
+                  </p>
+                </div>
+              </div>
+
+              <span className="player-count">
+                {participants.length} Players
+              </span>
+
+            </div>
+
+            <div className="leaderboard-list">
+
+              {participants.length === 0 ? (
+                <div className="leaderboard-empty">
+                  <p>
+                    No player results available yet.
+                  </p>
+                </div>
+              ) : (
+                participants.map(
+                  (player, index) => {
+
+                    const isCurrentPlayer =
+                      player.uid ===
+                      currentUserId;
+
+                    const playerPercentage =
+                      totalQuestions > 0
+                        ? Math.round(
+                            ((player.score || 0) /
+                              totalQuestions) *
+                              100
+                          )
+                        : 0;
+
+                    return (
+                      <div
+                        key={player.id}
+                        className={`leaderboard-player ${
+                          isCurrentPlayer
+                            ? "current-player"
+                            : ""
+                        }`}
+                      >
+
+                        <div className="rank-number">
+
+                          {index === 0
+                            ? "🥇"
+                            : index === 1
+                            ? "🥈"
+                            : index === 2
+                            ? "🥉"
+                            : `#${index + 1}`}
+
+                        </div>
+
+                        <div className="player-info">
+
+                          <strong>
+                            {player.name ||
+                              "Participant"}
+
+                            {isCurrentPlayer &&
+                              " (You)"}
+                          </strong>
+
+                          <span>
+                            {player.finished
+                              ? "Quiz completed"
+                              : "Still playing"}
+                          </span>
+
+                        </div>
+
+                        <div className="player-score">
+
+                          <strong>
+                            {player.score || 0}/
+                            {totalQuestions}
+                          </strong>
+
+                          <span>
+                            {playerPercentage}%
+                          </span>
+
+                        </div>
+
+                      </div>
+                    );
+                  }
+                )
+              )}
+
+            </div>
+
+          </div>
+
+          {/* =========================================
+              ANSWER REVIEW
+          ========================================= */}
 
           <div className="answer-review-card">
 
             <div className="answer-review-header">
 
               <div>
+
                 <span className="review-icon">
                   📋
                 </span>
@@ -340,6 +845,7 @@ function QuizPage() {
                     and the correct answers.
                   </p>
                 </div>
+
               </div>
 
               <span className="review-score">
@@ -348,40 +854,51 @@ function QuizPage() {
 
             </div>
 
-
             <div className="answer-list">
 
               {quiz.questions.map(
                 (question, index) => {
 
                   const userAnswer =
-                    answers[index];
+                    submittedAnswers[index];
 
                   const correctAnswer =
-                    question.answer
-                      ?.toString()
-                      .trim()
-                      .charAt(0)
-                      .toUpperCase();
+                    getCorrectAnswerLetter(
+                      question
+                    );
 
                   const isCorrect =
-                    userAnswer ===
-                    correctAnswer;
+                    userAnswer &&
+                    correctAnswer &&
+                    userAnswer.toUpperCase() ===
+                      correctAnswer.toUpperCase();
+
+                  /*
+                    Convert A/B/C/D to option index.
+                  */
+
+                  const userIndex =
+                    userAnswer
+                      ? userAnswer.charCodeAt(0) -
+                        65
+                      : -1;
+
+                  const correctIndex =
+                    correctAnswer
+                      ? correctAnswer.charCodeAt(0) -
+                        65
+                      : -1;
 
                   const userOption =
+                    userIndex >= 0 &&
                     question.options?.[
-                      userAnswer
-                        ? userAnswer.charCodeAt(0) -
-                          65
-                        : -1
+                      userIndex
                     ];
 
                   const correctOption =
+                    correctIndex >= 0 &&
                     question.options?.[
-                      correctAnswer
-                        ? correctAnswer.charCodeAt(0) -
-                          65
-                        : -1
+                      correctIndex
                     ];
 
                   return (
@@ -393,6 +910,8 @@ function QuizPage() {
                           : "answer-wrong"
                       }`}
                     >
+
+                      {/* TOP */}
 
                       <div className="review-question-top">
 
@@ -414,10 +933,11 @@ function QuizPage() {
 
                       </div>
 
+                      {/* QUESTION */}
+
                       <h3>
                         {question.question}
                       </h3>
-
 
                       {/* USER ANSWER */}
 
@@ -429,12 +949,14 @@ function QuizPage() {
 
                         <strong>
                           {userAnswer
-                            ? `${userAnswer}) ${userOption}`
+                            ? `${userAnswer}) ${
+                                userOption ||
+                                "Unknown option"
+                              }`
                             : "Not answered"}
                         </strong>
 
                       </div>
-
 
                       {/* CORRECT ANSWER */}
 
@@ -446,8 +968,11 @@ function QuizPage() {
 
                         <strong>
                           {correctAnswer
-                            ? `${correctAnswer}) ${correctOption}`
-                            : "Not available"}
+                            ? `${correctAnswer}) ${
+                                correctOption ||
+                                "Unknown option"
+                              }`
+                            : "Correct answer not available"}
                         </strong>
 
                       </div>
@@ -462,13 +987,14 @@ function QuizPage() {
           </div>
 
         </div>
+
       </div>
     );
   }
 
-  // =========================================
+  // =========================================================
   // CURRENT QUESTION
-  // =========================================
+  // =========================================================
 
   const question =
     quiz.questions[currentQuestion];
@@ -478,16 +1004,18 @@ function QuizPage() {
       quiz.questions.length) *
     100;
 
-  // =========================================
+  // =========================================================
   // QUIZ UI
-  // =========================================
+  // =========================================================
 
   return (
     <div className="quiz-page">
 
       <div className="quiz-container">
 
-        {/* HEADER */}
+        {/* =========================================
+            HEADER
+        ========================================= */}
 
         <div className="quiz-header">
 
@@ -524,8 +1052,9 @@ function QuizPage() {
 
         </div>
 
-
-        {/* PROGRESS */}
+        {/* =========================================
+            PROGRESS
+        ========================================= */}
 
         <div className="quiz-progress">
 
@@ -557,8 +1086,9 @@ function QuizPage() {
 
         </div>
 
-
-        {/* QUESTION CARD */}
+        {/* =========================================
+            QUESTION CARD
+        ========================================= */}
 
         <div className="quiz-card">
 
@@ -570,8 +1100,9 @@ function QuizPage() {
             {question.question}
           </h2>
 
-
-          {/* OPTIONS */}
+          {/* =========================================
+              OPTIONS
+          ========================================= */}
 
           <div className="quiz-options">
 
@@ -624,10 +1155,12 @@ function QuizPage() {
 
           </div>
 
-
-          {/* NEXT */}
+          {/* =========================================
+              NEXT / FINISH
+          ========================================= */}
 
           <button
+            type="button"
             className="quiz-next-btn"
             onClick={handleNext}
           >
