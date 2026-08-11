@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
+import "./QuizPage.css";
 
 import {
   generateQuizQuestions,
